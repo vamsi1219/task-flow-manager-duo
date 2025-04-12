@@ -2,7 +2,8 @@
 import React from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { MoonIcon, SunIcon, LogOut } from "lucide-react";
+import { MoonIcon, SunIcon, LogOut, UserPlus } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Header: React.FC = () => {
   const { currentUser, logout, isAdmin } = useAuth();
@@ -25,6 +26,16 @@ const Header: React.FC = () => {
                   {currentUser.role}
                 </span>
               </span>
+              
+              {isAdmin() && (
+                <Link to="/register">
+                  <Button variant="outline" size="sm" className="flex items-center gap-1">
+                    <UserPlus className="h-4 w-4" />
+                    Add Employee
+                  </Button>
+                </Link>
+              )}
+              
               <Button variant="ghost" size="icon" onClick={logout}>
                 <LogOut className="h-5 w-5" />
               </Button>

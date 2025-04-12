@@ -1,7 +1,7 @@
 
 import React, { createContext, useState, useContext, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 export type Role = "admin" | "employee";
 
@@ -17,6 +17,7 @@ interface AuthContextType {
   login: (email: string, password: string) => void;
   logout: () => void;
   isAdmin: () => boolean;
+  registerEmployee: (name: string, email: string, password: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -47,6 +48,11 @@ const MOCK_USERS = [
 ];
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [users, setUsers] = useState(() => {
+    const savedUsers = localStorage.getItem("users");
+    return savedUsers ? JSON.parse(savedUsers) : MOCK_USERS;
+  });
+  
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const savedUser = localStorage.getItem("currentUser");
     return savedUser ? JSON.parse(savedUser) : null;
@@ -56,8 +62,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const { toast } = useToast();
 
   const login = (email: string, password: string) => {
-    const user = MOCK_USERS.find(
-      (u) => u.email === email && u.password === password
+    const user = users.find(
+      (u: any) => u.email === email && u.password === password
     );
 
     if (user) {
@@ -99,8 +105,41 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return currentUser?.role === "admin";
   };
 
+  const registerEmployee = (name: string, email: string, password: string) => {
+    // Check if email already exists
+    if (users.some((u: any) => u.email === email)) {
+      toast({
+        variant: "destructive",
+        title: "Registration failed",
+        description: "Email already in use.",
+      });
+      return false;
+    }
+
+    // Generate unique ID
+    const newId = (Math.max(...users.map((u: any) => parseInt(u.id))) + 1).toString();
+    
+    // Create new user
+    const newUser = {
+      id: newId,
+      name,
+      email,
+      password,
+      role: "employee" as Role
+    };
+
+    // Add to users array
+    const updatedUsers = [...users, newUser];
+    setUsers(updatedUsers);
+    
+    // Store in localStorage
+    localStorage.setItem("users", JSON.stringify(updatedUsers));
+    
+    return true;
+  };
+
   return (
-    <AuthContext.Provider value={{ currentUser, login, logout, isAdmin }}>
+    <AuthContext.Provider value={{ currentUser, login, logout, isAdmin, registerEmployee }}>
       {children}
     </AuthContext.Provider>
   );

@@ -11,6 +11,7 @@ import NotFound from "./pages/NotFound";
 import LoginPage from "./pages/LoginPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import EmployeeDashboard from "./pages/EmployeeDashboard";
+import RegistrationPage from "./pages/RegistrationPage";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ const App = () => (
               <Route path="/login" element={<LoginPage />} />
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
               <Route path="/employee/dashboard" element={<EmployeeDashboard />} />
+              <Route path="/register" element={<RegistrationPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </TooltipProvider>
