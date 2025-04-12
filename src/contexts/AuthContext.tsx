@@ -1,7 +1,8 @@
 
-import React, { createContext, useState, useContext, ReactNode } from "react";
+import React, { createContext, useState, useContext, ReactNode, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { authApi } from "@/services/api";
 
 export type Role = "admin" | "employee";
 
@@ -14,132 +15,116 @@ export interface User {
 
 interface AuthContextType {
   currentUser: User | null;
-  login: (email: string, password: string) => void;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
   isAdmin: () => boolean;
-  registerEmployee: (name: string, email: string, password: string) => boolean;
+  registerEmployee: (name: string, email: string, password: string) => Promise<boolean>;
+  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users for demo
-const MOCK_USERS = [
-  {
-    id: "1",
-    name: "Admin User",
-    email: "admin@example.com",
-    password: "admin123",
-    role: "admin" as Role,
-  },
-  {
-    id: "2",
-    name: "Employee 1",
-    email: "employee1@example.com",
-    password: "employee1",
-    role: "employee" as Role,
-  },
-  {
-    id: "3",
-    name: "Employee 2",
-    email: "employee2@example.com",
-    password: "employee2",
-    role: "employee" as Role,
-  },
-];
-
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [users, setUsers] = useState(() => {
-    const savedUsers = localStorage.getItem("users");
-    return savedUsers ? JSON.parse(savedUsers) : MOCK_USERS;
-  });
-  
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const savedUser = localStorage.getItem("currentUser");
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
-  
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const login = (email: string, password: string) => {
-    const user = users.find(
-      (u: any) => u.email === email && u.password === password
-    );
+  useEffect(() => {
+    const initAuth = async () => {
+      const token = localStorage.getItem("authToken");
+      if (token) {
+        try {
+          const userData = await authApi.getCurrentUser();
+          setCurrentUser(userData);
+        } catch (error) {
+          // If token is invalid, clear it
+          localStorage.removeItem("authToken");
+          console.error("Authentication error:", error);
+        }
+      }
+      setIsLoading(false);
+    };
 
-    if (user) {
-      const { password, ...userWithoutPassword } = user;
-      setCurrentUser(userWithoutPassword);
-      localStorage.setItem("currentUser", JSON.stringify(userWithoutPassword));
+    initAuth();
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    try {
+      setIsLoading(true);
+      const response = await authApi.login(email, password);
+      
+      // Save token in localStorage
+      localStorage.setItem("authToken", response.token);
+      
+      // Set current user
+      setCurrentUser(response.user);
       
       toast({
         title: "Login successful",
-        description: `Welcome back, ${userWithoutPassword.name}!`,
+        description: `Welcome back, ${response.user.name}!`,
       });
       
-      if (userWithoutPassword.role === "admin") {
+      if (response.user.role === "admin") {
         navigate("/admin/dashboard");
       } else {
         navigate("/employee/dashboard");
       }
-    } else {
+    } catch (error) {
       toast({
         variant: "destructive",
         title: "Login failed",
-        description: "Invalid email or password.",
+        description: error instanceof Error ? error.message : "Invalid email or password.",
       });
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const logout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem("currentUser");
-    navigate("/");
-    
-    toast({
-      title: "Logged out",
-      description: "You have been successfully logged out.",
-    });
+  const logout = async () => {
+    try {
+      await authApi.logout();
+      setCurrentUser(null);
+      
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out.",
+      });
+      
+      navigate("/");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
   const isAdmin = () => {
     return currentUser?.role === "admin";
   };
 
-  const registerEmployee = (name: string, email: string, password: string) => {
-    // Check if email already exists
-    if (users.some((u: any) => u.email === email)) {
+  const registerEmployee = async (name: string, email: string, password: string) => {
+    try {
+      await authApi.register(name, email, password, "employee");
+      
+      toast({
+        title: "Registration Successful",
+        description: `Employee ${name} has been registered successfully.`,
+      });
+      
+      return true;
+    } catch (error) {
       toast({
         variant: "destructive",
-        title: "Registration failed",
-        description: "Email already in use.",
+        title: "Registration Failed",
+        description: error instanceof Error ? error.message : "Failed to register employee",
       });
+      
       return false;
     }
-
-    // Generate unique ID
-    const newId = (Math.max(...users.map((u: any) => parseInt(u.id))) + 1).toString();
-    
-    // Create new user
-    const newUser = {
-      id: newId,
-      name,
-      email,
-      password,
-      role: "employee" as Role
-    };
-
-    // Add to users array
-    const updatedUsers = [...users, newUser];
-    setUsers(updatedUsers);
-    
-    // Store in localStorage
-    localStorage.setItem("users", JSON.stringify(updatedUsers));
-    
-    return true;
   };
 
   return (
-    <AuthContext.Provider value={{ currentUser, login, logout, isAdmin, registerEmployee }}>
+    <AuthContext.Provider value={{ currentUser, login, logout, isAdmin, registerEmployee, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

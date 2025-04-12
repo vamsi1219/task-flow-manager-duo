@@ -8,17 +8,19 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { authApi } from "@/services/api";
 
 const RegistrationPage: React.FC = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const { registerEmployee, isAdmin } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!isAdmin()) {
@@ -39,15 +41,24 @@ const RegistrationPage: React.FC = () => {
       });
       return;
     }
-    
-    const success = registerEmployee(name, email, password);
-    
-    if (success) {
+
+    try {
+      setIsLoading(true);
+      await authApi.register(name, email, password, "employee");
+      
       toast({
         title: "Registration Successful",
         description: `Employee ${name} has been registered successfully.`
       });
       navigate("/admin/dashboard");
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Registration Failed",
+        description: error instanceof Error ? error.message : "Failed to register employee"
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -113,7 +124,9 @@ const RegistrationPage: React.FC = () => {
               </div>
             </CardContent>
             <CardFooter>
-              <Button type="submit" className="w-full">Register Employee</Button>
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? "Registering..." : "Register Employee"}
+              </Button>
             </CardFooter>
           </form>
         </Card>
